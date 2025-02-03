@@ -15,6 +15,8 @@
 
 #include <lvgl.h>
 #include <time.h>
+#include <display/lv_display_private.h>
+#include <indev/lv_indev_private.h>
 
 #if LV_USE_TFT_ESPI
 #include <TFT_eSPI.h>
@@ -33,20 +35,19 @@ uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 static lv_disp_t *disp;
 static lv_indev_t *indev;
 
-void draw_circle(lv_coord_t x, lv_coord_t y)
-{
+void draw_circle(lv_coord_t x, lv_coord_t y) {
     lv_obj_t *circle = lv_obj_create(lv_scr_act());
     lv_obj_set_size(circle, 10, 10);
     lv_obj_set_style_radius(circle, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(circle, lv_color_hex(0xFF0000), 0);
+
     lv_obj_align(circle, LV_ALIGN_CENTER, x - (TFT_WIDTH / 2), y - (TFT_HEIGHT / 2));
 }
 
 static lv_obj_t *clock_label;
 static lv_style_t clock_style;
 
-void update_clock(lv_timer_t *timer)
-{
+void update_clock(lv_timer_t *timer) {
     time_t now;
     struct tm timeinfo;
     char buffer[10];
@@ -59,12 +60,12 @@ void update_clock(lv_timer_t *timer)
     lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 0);
 }
 
-void setup_clock()
-{
+void setup_clock() {
     lv_style_init(&clock_style);
     lv_style_set_text_font(&clock_style, &lv_font_montserrat_28); // Set font size
 
     clock_label = lv_label_create(lv_scr_act());
+    lv_label_set_text(clock_label, "");
     lv_obj_add_style(clock_label, &clock_style, LV_PART_MAIN);
     lv_obj_align(clock_label, LV_ALIGN_CENTER, 0, 0);
 
@@ -73,25 +74,27 @@ void setup_clock()
 
 
 #if HAS_TOUCH
-void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
-{
+void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
     static lv_coord_t last_x = 0;
     static lv_coord_t last_y = 0;
 
     uint8_t touched = touch->getPoint(x, y, 1); // Directly get touch points
-    if (touched > 0)
-    {
-        last_x = x[0];
-        last_y = y[0];
+    if (touched > 0) {
+        lv_coord_t adjusted_x = x[0];
+        lv_coord_t adjusted_y = y[0];
+
+        Serial.printf("Touch coordinates: x = %d, y = %d\n", adjusted_x, adjusted_y);
+        Serial.printf("Data coordinates: x = %d, y = %d\n", data->point.x, data->point.y);
+
+        last_x = adjusted_x;
+        last_y = adjusted_y;
 
         data->point.x = last_x;
         data->point.y = last_y;
         data->state = LV_INDEV_STATE_PRESSED;
 
         draw_circle(last_x, last_y);
-    }
-    else
-    {
+    } else {
         data->point.x = last_x;
         data->point.y = last_y;
         data->state = LV_INDEV_STATE_RELEASED;
@@ -99,8 +102,7 @@ void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data)
 }
 #endif
 
-void setup()
-{
+void setup() {
     Serial.begin(SERIAL_BAUDRATE);
 
     lv_init();
@@ -109,7 +111,7 @@ void setup()
 
     /*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
     disp = lv_tft_espi_create(TFT_WIDTH, TFT_HEIGHT, draw_buf, sizeof(draw_buf));
-    lv_display_set_rotation(disp, TFT_ROTATION);
+    // lv_display_set_rotation(disp, TFT_ROTATION);
 
 #if HAS_TOUCH
     bool result = false;
@@ -127,8 +129,7 @@ void setup()
     touch = new TouchDrvGT911();
     touch->setPins(TOUCH_RST, TOUCH_IRQ);
     result = touch->begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL);
-    if (result)
-    {
+    if (result) {
         const char *model = touch->getModelName();
         Serial.printf("Successfully initialized %s, using %s Driver!\n", model, model);
     }
@@ -146,8 +147,7 @@ void setup()
     setup_clock();
 }
 
-void loop()
-{
+void loop() {
     lv_tick_inc(5); // Fixed tick increment
     lv_timer_handler();
     delay(5);
