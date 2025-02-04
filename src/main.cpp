@@ -1,4 +1,6 @@
+#if ARDUINO
 #include <Arduino.h>
+#endif
 
 #if ARDUINO_WAVESHARE_ESP32S3_TOUCH_LCD_128
 #include <TouchDrvInterface.hpp>
@@ -103,14 +105,21 @@ void touchpad_read(lv_indev_t *indev, lv_indev_data_t *data) {
 #endif
 
 void setup() {
+#if ARDUINO
     Serial.begin(SERIAL_BAUDRATE);
-
+#endif
     lv_init();
 
     // lv_obj_set_scrollbar_mode(lv_scr_act(), LV_SCROLLBAR_MODE_OFF);
 
     /*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
+#if LV_USE_TFT_ESPI
     disp = lv_tft_espi_create(TFT_WIDTH, TFT_HEIGHT, draw_buf, sizeof(draw_buf));
+#elif LV_USE_SDL
+    disp = lv_sdl_window_create(TFT_WIDTH, TFT_HEIGHT);
+#else
+#pragma error "no display driver configured"
+#endif
     // lv_display_set_rotation(disp, TFT_ROTATION);
 
 #if HAS_TOUCH
@@ -150,5 +159,21 @@ void setup() {
 void loop() {
     lv_tick_inc(5); // Fixed tick increment
     lv_timer_handler();
+
+#if ARDUINO    
     delay(5);
+#endif
 }
+
+#if LV_USE_SDL
+    int main(int argc, char *argv[])
+    {
+        setup();  // Call the existing setup()
+        
+        while (true) {
+            loop();  // Run loop continuously
+        }
+
+        return 0;
+    }
+#endif
